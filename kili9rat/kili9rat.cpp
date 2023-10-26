@@ -32,7 +32,8 @@ int main()
             nRetCode = 1;
         }
         else
-        {
+        {   //1 进度的可能 2 项目对接方便 3 可行性评估，提早暴露风险
+            //服务器 > 套接字:socket、bind、listen、accept、read、write、close
             // TODO: 在此处为应用程序的行为编写代码。
         }
     }
