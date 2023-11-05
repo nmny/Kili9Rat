@@ -52,10 +52,10 @@ int main()
             if (pserver->InitSocket() == false) {
                 MessageBox(NULL, _T("网络初始化异常未能成功初始化，请检查网络状态"), _T("网络初始化失败"), MB_OK | MB_ICONERROR);
                 exit(0);
-                while (CServerSocket::getInstance() != NULL) {
-                }
+            }
+            while (CServerSocket::getInstance() != NULL) {
                 if (pserver->AccepClient() == false) {
-                    if (count > 3) {
+                    if (count >= 3) {
                         MessageBox(NULL, _T("多次重试无非正常接入网络，结束程序!"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
                         exit(0);
                     }
@@ -64,6 +64,7 @@ int main()
                 }
                 int ret = pserver->DealCommand();
                 //TODO
+
             }
 
         }
