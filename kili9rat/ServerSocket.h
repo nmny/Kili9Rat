@@ -2,6 +2,86 @@
 #include "pch.h"
 #include "framework.h"
 
+class CPacket
+{
+public:
+    CPacket():sHead(0), nLength(0), sCmd(0), sSum(0) {  //成员变量初始化
+    }
+    CPacket(WORD nCmd, const BYTE* pData, size_t nSize) { //用来封包
+        sHead = 0XFEFF;
+        nLength = nSize + 2 + 2;  //nLength strData+sCmd+sSum
+        sCmd = nCmd;
+        strData.resize(nSize);
+        memcpy((void*)strData.c_str(), pData, nSize);
+        sSum = 0;
+
+    };
+    CPacket(const CPacket& pack) {//赋值构造函数用来CPacket的赋值传递
+        sHead = pack.sHead;
+        nLength = pack.nLength;
+        sCmd = pack.sCmd;
+        strData = pack.strData;
+        sSum = pack.sSum;
+    }
+
+    CPacket(const BYTE* pData, size_t& nSize) { //用来解析包数据
+        size_t i = 0;
+        for (; i < nSize; i++) {
+            if(*(WORD*)(pData+i) == 0xFEFF){ //*(WORD*)：这部分是一个类型强制转换。它将pData中偏移i处的内存解释为一个WORD类型（通常是2个字节的整数），并通过*操作符来获得该     内存位置上的值。
+                sHead = *(WORD*)(pData + i);
+                i += 2; //未找到头有效退出 假如nSize里面有2bit(FEFF) 如果i没有+2,i=0,nSize=2 后面没有数据了再去解析长度程序就会崩溃 
+                break;
+            }
+        }
+        //+4长度 +2命令 +2和校验
+        if (i + 4 + 2 + 2 >= nSize) {//包数据可能不全，或者包头未能完全接收到   
+            nSize = 0;
+            return; }
+        //有数据继续往下读
+        nLength = *(DWORD*)(pData + i); i += 4;
+        if (nLength + i > nSize) {//包未完全接收到就返回，解析失败
+            nSize = 0;
+            return;
+        }
+        sCmd = *(WORD*)(pData + i); i + 2;
+        if(nLength > 4)
+        {
+            strData.resize(nLength - 2 - 2); //sCmd到sSum
+            memcpy((void*)strData.c_str(), pData + i, nLength - 4);
+            i += nLength - 4;
+        }
+        sSum = *(WORD*)(pData + i); i += 2; //i是标记用到哪了 nLength + 2 + 4在前面可能有废数据 后面解析出的一个包前面用过的应该被销毁掉 < i后面的移动到buff使buff继续工作 
+        WORD sum = 0;
+        for (int j = 0; j < strData.size(); j++)
+        {
+            sum += BYTE(strData[i]) & 0xFF;
+        }
+        if (sum == sSum) {
+            nSize = i; //+ nLength + 2 + 4;//包长 == head length data(不知道但是length标明了)...
+            return;
+        }
+        nSize = 0;
+    }
+    ~CPacket(){}
+    //等于号运算符重载
+    CPacket& operator=(const CPacket& pack) {
+        if (this != &pack) {
+            sHead = pack.sHead;
+            nLength = pack.nLength;
+            sCmd = pack.sCmd;
+            strData = pack.strData;
+            sSum = pack.sSum;
+        }
+        return *this;
+    }
+public:
+    WORD sHead; //固定位FE FF
+    DWORD nLength; //包长度 (从控制命令开始, 到和校验结束)
+    WORD sCmd; //控制命令
+    std::string strData; //包数据
+    WORD sSum; //和校验
+};
+
 class CServerSocket {
 public:
     // 静态函数，用于获取单例实例
@@ -48,29 +128,44 @@ public:
         return true;
     }
 
-
+#define BUFFER_SIZE 4096
     int DealCommand() {
-        if (m_client == -1)return false;
-
-        char buffer[1024] = "";
+        if (m_client == -1)return -1;
+        //char buffer[1024] = "";
+        char* buffer = new char[4096];
+        memset(buffer, 0, 4096);
+        size_t index = 0;
         while (true)
         {
-            int len = recv(m_client, buffer, sizeof(buffer), 0);
+            size_t len = recv(m_client, buffer + index, 4096 - index, 0);
             if (len <= 0) {
                 return -1;
             }
+            index += len;
+            len = index;
+            m_packet = CPacket((BYTE*)buffer, len);
+            if (len > 0) {
+                memmove(buffer, buffer + len, BUFFER_SIZE - len);
+                index -= len;
+                return m_packet.sCmd;
+            }
         }
+        return -1;
         //TODO 处理命令
 
     }
 
-    bool Seed(const char* pData, int nSize) {
+    bool Send(const char* pData, int nSize) {
+        if (m_client == -1)return false;
         return send(m_client, pData, nSize, 0) > 0;
     }
 
 
     //单例
 private:
+    SOCKET m_client;
+    SOCKET m_sock;
+    CPacket m_packet;
     // 防止拷贝构造 既不能赋值也不能让外部调用构造
     CServerSocket& operator=(const CServerSocket& ss) {};
     //复制构造函数  
@@ -78,8 +173,7 @@ private:
         m_sock = ss.m_sock;
         m_client = ss.m_client;    //初始化
     };
-    SOCKET m_client;
-    SOCKET m_sock;
+
     //构造函数
     CServerSocket() {
         m_client = INVALID_SOCKET; //-1

