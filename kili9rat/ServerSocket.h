@@ -27,7 +27,7 @@ public:
     CPacket(const BYTE* pData, size_t& nSize) { //用来解析包数据
         size_t i = 0;
         for (; i < nSize; i++) {
-            if(*(WORD*)(pData+i) == 0xFEFF){ //*(WORD*)：这部分是一个类型强制转换。它将pData中偏移i处的内存解释为一个WORD类型（通常是2个字节的整数），并通过*操作符来获得该     内存位置上的值。
+            if(*(WORD*)(pData+i) == 0xFEFF){ //*(WORD*)：这部分是一个类型强制转换。它将pData中偏移i处的内存解释为一个WORD类型（通常是2个字节的整数），并通过*操作符来获得该内存位置上的值。
                 sHead = *(WORD*)(pData + i);
                 i += 2; //未找到头有效退出 假如nSize里面有2bit(FEFF) 如果i没有+2,i=0,nSize=2 后面没有数据了再去解析长度程序就会崩溃 
                 break;
@@ -50,8 +50,8 @@ public:
             memcpy((void*)strData.c_str(), pData + i, nLength - 4);
             i += nLength - 4;
         }
-        sSum = *(WORD*)(pData + i); i += 2; //i是标记用到哪了 nLength + 2 + 4在前面可能有废数据 后面解析出的一个包前面用过的应该被销毁掉 < i后面的移动到buff使buff继续工作 
-        WORD sum = 0;
+        sSum = *(WORD*)(pData + i); i += 2; //i是标记用到哪了 nLength + 2 + 4在前面可能有废数据 后面解析出的一个包前面用过的应该被销毁掉 < i后面的移动到buff前面使buff继续工作 
+        WORD sum = 0;//和校验
         for (int j = 0; j < strData.size(); j++)
         {
             sum += BYTE(strData[i]) & 0xFF;
@@ -132,12 +132,12 @@ public:
     int DealCommand() {
         if (m_client == -1)return -1;
         //char buffer[1024] = "";
-        char* buffer = new char[4096];
-        memset(buffer, 0, 4096);
-        size_t index = 0;
+        char* buffer = new char[BUFFER_SIZE];
+        memset(buffer, 0, BUFFER_SIZE);
+        size_t index = 0;               //假设首次接收100个字节(index=100) 解包发现前50个为包数据(len=50)
         while (true)
         {
-            size_t len = recv(m_client, buffer + index, 4096 - index, 0);
+            size_t len = recv(m_client, buffer + index, BUFFER_SIZE - index, 0);
             if (len <= 0) {
                 return -1;
             }
@@ -146,13 +146,11 @@ public:
             m_packet = CPacket((BYTE*)buffer, len);
             if (len > 0) {
                 memmove(buffer, buffer + len, BUFFER_SIZE - len);
-                index -= len;
+                index -= len;           //index-50后面的50个字节buffer往前移(memmove)把BUFFER_SIZE - len后面剩余的往移
                 return m_packet.sCmd;
             }
         }
         return -1;
-        //TODO 处理命令
-
     }
 
     bool Send(const char* pData, int nSize) {
