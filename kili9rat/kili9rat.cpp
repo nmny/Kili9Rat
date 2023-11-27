@@ -34,7 +34,7 @@ std::string MakeDriverInfo()
     }
     //发送命令 需要先封包CPacket封解包
     //CServerSocket::getInstance()->Send(CPacket());
-    return 0;
+    return 1;
 }
 
 int main()
