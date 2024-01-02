@@ -21,19 +21,34 @@
 CWinApp theApp;
 
 using namespace std;
+void Dump(BYTE* pData, size_t nSize){
+    std::string strOut;
+    for (size_t i = 0; i < nSize; i++)
+    {
+        char buf[8] = "";
+        if (i > 0 && (i % 16 == 0))strOut += "\n";
+        snprintf(buf, sizeof(buf), "%02X ", pData[i] & 0xFF);//这里取0xFF防止负数所产生意向外的影响
+        strOut += buf;
+    }
+    strOut += "\n";
+    OutputDebugStringA(strOut.c_str());
+}
 
 //获取磁盘分区信息
-std::string MakeDriverInfo()
+int MakeDriverInfo()       //1==>A 2==>B 3==>C...26==>Z
 {
     std::string result;
     for (int i = 1; i <= 26; i++) {
-        if (_chdrive(i) == 0) {
+        //返回0是代表切换成功
+        if (_chdrive(i) == 0) { 
             if (result.size() > 0) result += ',';
             result += 'A' + i - 1;
         }
     }
-    //发送命令 需要先封包CPacket封解包
-    //CServerSocket::getInstance()->Send(CPacket());
+    //发送命令 需要先封包   CPacket封解包
+    CPacket pack(1, (BYTE*)result.c_str(), result.size());
+    Dump((BYTE*)pack.Data(),pack.Size());
+    //CServerSocket::getInstance()->Send(pack);
     return 0;
 }
 
@@ -86,8 +101,15 @@ int main()
             //    //TODO
             //}
 
-
-
+            //实现功能
+            int nCmd = 1;
+            switch (nCmd){
+            case 1: //查看磁盘分区
+            default:
+                MakeDriverInfo();
+                break;
+            }
+            
 
         }
     }

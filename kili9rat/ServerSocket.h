@@ -2,20 +2,27 @@
 #include "pch.h"
 #include "framework.h"
 
+#pragma pack(push) //push入栈保存当前的状态
+#pragma pack(1) //pack改为1
 class CPacket
 {
 public:
     CPacket():sHead(0), nLength(0), sCmd(0), sSum(0) {  //成员变量初始化
     }
     CPacket(WORD nCmd, const BYTE* pData, size_t nSize) { //用来封包
-        sHead = 0XFEFF;
-        nLength = nSize + 2 + 2;  //nLength strData+sCmd+sSum
+        sHead = 0xFEFF;
+        nLength = nSize + 4;  //nLength strData+sCmd+sSum
         sCmd = nCmd;
         strData.resize(nSize);
         memcpy((void*)strData.c_str(), pData, nSize);
         sSum = 0;
+        for (int j = 0; j < strData.size(); j++)
+        {
+            sSum += BYTE(strData[j]) & 0xFF;
+        }
 
     };
+
     CPacket(const CPacket& pack) {//赋值构造函数用来CPacket的赋值传递
         sHead = pack.sHead;
         nLength = pack.nLength;
@@ -54,7 +61,7 @@ public:
         WORD sum = 0;//和校验
         for (int j = 0; j < strData.size(); j++)
         {
-            sum += BYTE(strData[i]) & 0xFF;
+            sum += BYTE(strData[j]) & 0xFF;
         }
         if (sum == sSum) {
             nSize = i; //+ nLength + 2 + 4;//包长 == head length data(不知道但是length标明了)...
@@ -74,12 +81,29 @@ public:
         }
         return *this;
     }
+    int Size() { //包数据大小
+        return nLength + 6;
+    }
+    const char* Data() { //包的值
+        strOut.resize(nLength + 6);
+        BYTE* pData = (BYTE*)strOut.c_str();
+        //指针指向数据然后利用其把数据往里面填
+        *(WORD*)pData = sHead; pData += 2;
+        *(DWORD*)(pData) = nLength; pData += 4;
+        *(WORD*)pData = sCmd; pData += 2;
+        memcpy(pData, strData.c_str(), strData.size()); pData += strData.size();
+        *(WORD*)pData = sSum;
+        return strOut.c_str();
+    }
+
+
 public:
     WORD sHead; //固定位FE FF
     DWORD nLength; //包长度 (从控制命令开始, 到和校验结束)
     WORD sCmd; //控制命令
     std::string strData; //包数据
     WORD sSum; //和校验
+    std::string strOut; //整个包的数据
 };
 
 class CServerSocket {
@@ -92,6 +116,7 @@ public:
         }
         return m_instance;
     };
+#pragma pack(pop) //还原
 
     //socket初始化
     bool InitSocket() {
@@ -156,6 +181,13 @@ public:
     bool Send(const char* pData, int nSize) {
         if (m_client == -1)return false;
         return send(m_client, pData, nSize, 0) > 0;
+    }
+
+    //设置允许Send发送pack
+    bool Send(CPacket& pack) {
+        if (m_client == -1)return false;
+        return send(m_client, (const char*)&pack, pack.nLength + 2 + 4, 0) > 0;   //pack转换为缓冲区用来存放东西 +head(2)+data(4)
+
     }
 
 
